@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+name.txt
+address.txt
