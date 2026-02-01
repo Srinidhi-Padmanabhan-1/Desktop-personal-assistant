@@ -4,6 +4,9 @@ import datetime
 import tkinter as tk
 import threading
 from tkinter.scrolledtext import ScrolledText
+import os
+import time
+import random
 
 # Import the external logic file
 import processOrder 
@@ -14,7 +17,7 @@ lang = 'en-US'
 
 # State control variables
 is_muted = False
-input_event = threading.Event() # Used to synchronize text input
+input_event = threading.Event() 
 user_text_input = ""
 
 ADDR = None
@@ -38,13 +41,66 @@ title_frame = tk.Frame(root, bg="#8425f7", height=60)
 title_frame.pack(fill=tk.X)
 
 title_label = tk.Label(
-    title_frame, text="Emma - Your personal Assistant", bg="#8425f7", fg="#ECF0F1", font=("Helvetica", 18, "bold")
+    title_frame, text="Emma - Your AI Assistant", bg="#8425f7", fg="#ECF0F1", font=("Helvetica", 18, "bold")
 )
 title_label.pack(pady=10)
+
+# Output Frame
+output_frame = tk.Frame(root, bg="#1cb0ff", bd=2, relief=tk.RIDGE)
+output_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+output_text = ScrolledText(output_frame, wrap=tk.WORD, font=("Helvetica", 12), bg="#160840", fg="#ECF0F1", bd=0)
+output_text.pack(expand=True, fill=tk.BOTH, padx=10, pady=10)
+
+# Configure tags
+output_text.tag_config('emma', foreground='#b3ff00')
+output_text.tag_config('user', foreground='#00ff9d')
+output_text.tag_config('system', foreground='#ff6b6b')
+# New tag for temporary status text (Italic and slightly dimmer color)
+output_text.tag_config('temp_status', foreground='#aaaaaa', font=("Helvetica", 12, "italic"))
+
+
+def update_gui_output(text, who_responding="Emma"):
+    """
+    Inserts PERMANENT text into the chat window.
+    """
+    output_text.insert(tk.END, text + "\n", ('user' if who_responding != "Emma" else 'emma'))
+    output_text.see(tk.END)
+
+
+def set_status(text):
+    """
+    Sets a TEMPORARY status message that can be deleted later.
+    """
+    # First, clear any existing status
+    clear_status()
+    # Insert new status with the 'temp_status' tag
+    output_text.insert(tk.END, text, 'temp_status')
+    output_text.see(tk.END)
+
+
+def clear_status():
+    """
+    Removes any text marked as 'temp_status'.
+    """
+    try:
+        # tag_ranges returns start, end, start, end... of the tag
+        ranges = output_text.tag_ranges('temp_status')
+        for i in range(0, len(ranges), 2):
+            output_text.delete(ranges[i], ranges[i+1])
+    except Exception:
+        pass
+
 
 # --- RESTART FUNCTION ---
 def restart_assistant():
     global assistant_running
+    
+    # Clear the chat window
+    output_text.delete('1.0', tk.END)
+    # Temporary status
+    set_status("System: Restarting...")
+
     assistant_running = True
     assistant_thread = threading.Thread(target=main, daemon=True)
     assistant_thread.start()
@@ -59,30 +115,62 @@ def toggle_mute():
     global is_muted
     is_muted = not is_muted
     
+    # We do NOT print text here anymore. 
+    # takeCommand() loop picks up the state change and sets the temporary status.
     if is_muted:
         mute_button.config(text="🔇", bg="red")
         input_entry.config(state=tk.NORMAL)
         send_btn.config(state=tk.NORMAL)
-        update_gui_output("System: Muted. Type your commands below.", "System")
+        # Force a status update immediately for better UX
+        set_status("System: Muted. Waiting for text...")
     else:
         mute_button.config(text="🔊", bg="#1cb0ff")
         input_entry.config(state=tk.DISABLED)
         send_btn.config(state=tk.DISABLED)
-        update_gui_output("System: Unmuted. Listening to microphone...", "System")
-        # If we were waiting for text, release the wait so it can check loop again
-        input_event.set() 
+        # Release the event to unblock text input loop if needed
+        input_event.set()
+        set_status("System: Unmuted. Switching to voice...")
 
 mute_button = tk.Button(
     title_frame, text="🔊", bg="#1cb0ff", fg="#ECF0F1", font=("Helvetica", 14, "bold"), command=toggle_mute, width=3,
 )
 mute_button.place(x=60, y=5)
 
-# Output Frame
-output_frame = tk.Frame(root, bg="#1cb0ff", bd=2, relief=tk.RIDGE)
-output_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+# --- SAVE CHAT LOGIC ---
+def save_chat_history():
+    folder_name = "saved_chats"
+    if not os.path.exists(folder_name):
+        os.makedirs(folder_name)
 
-output_text = ScrolledText(output_frame, wrap=tk.WORD, font=("Helvetica", 12), bg="#160840", fg="#ECF0F1", bd=0)
-output_text.pack(expand=True, fill=tk.BOTH, padx=10, pady=10)
+    i = 1
+    while True:
+        filename = os.path.join(folder_name, f"chat_{i}.txt")
+        if not os.path.exists(filename):
+            break
+        i += 1
+    
+    # Get all text. This captures visible text.
+    # Note: If 'temp_status' is currently visible, it might be captured.
+    # We can clear status briefly before saving.
+    clear_status()
+    chat_content = output_text.get("1.0", "end-1c")
+    
+    if chat_content.strip() == "":
+        set_status("System: Chat is empty, nothing to save.")
+        return
+
+    try:
+        with open(filename, "w", encoding="utf-8") as f:
+            f.write(chat_content)
+        update_gui_output(f"System: Chat saved to {filename}", "System")
+    except Exception as e:
+        update_gui_output(f"System: Error saving chat - {str(e)}", "System")
+
+save_button = tk.Button(
+    title_frame, text="💾", bg="#1cb0ff", fg="#ECF0F1", font=("Helvetica", 14, "bold"), command=save_chat_history, width=3,
+)
+save_button.place(x=110, y=5)
+
 
 # --- INPUT FRAME (For Text Mode) ---
 input_frame = tk.Frame(root, bg="#160840", height=50)
@@ -94,7 +182,7 @@ def submit_text(event=None):
     if text.strip() != "":
         user_text_input = text
         input_entry.delete(0, tk.END)
-        input_event.set() # Signal the main thread that input is ready
+        input_event.set() 
 
 input_entry = tk.Entry(input_frame, font=("Helvetica", 14), bg="#2c3e50", fg="white", state=tk.DISABLED)
 input_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
@@ -105,24 +193,13 @@ send_btn = tk.Button(input_frame, text="Send", font=("Helvetica", 12, "bold"), b
 send_btn.pack(side=tk.RIGHT)
 
 
-def update_gui_output(text, who_responding="Emma"):
-    output_text.insert(tk.END, text + "\n", ('user' if who_responding != "Emma" else 'emma'))
-    output_text.tag_config('emma', foreground='#b3ff00')
-    output_text.tag_config('user', foreground='#00ff9d')
-    output_text.tag_config('system', foreground='#ff6b6b')
-    output_text.see(tk.END)
-
-
 def speak(audio):
     update_gui_output("Emma: " + audio, "Emma")
     
-    # Only speak voice if NOT muted
     if not is_muted:
-        # Initialize engine LOCALLY to prevent Windows 10 Threading/COM errors
         engine = pyttsx3.init('sapi5')
         voices = engine.getProperty('voices')
         
-        # Safe voice selection
         try:
             engine.setProperty('voice', voices[2].id)
         except IndexError:
@@ -142,14 +219,24 @@ def takeCommand():
 
     # --- MODE 1: TEXT INPUT (MUTED) ---
     if is_muted:
-        update_gui_output("Waiting for text...", "System")
+        # Set temporary status
+        set_status("System: Muted. Waiting for text...")
         
         while is_muted: 
             is_set = input_event.wait(timeout=0.5)
             if is_set:
                 input_event.clear()
                 if user_text_input:
+                    # 1. Show user input permanently
                     update_gui_output(f"User typed: {user_text_input}", "User")
+                    
+                    # 2. Show Processing with Delay
+                    set_status("Processing...")
+                    # Random delay between 0.75 and 1.25 seconds
+                    time.sleep(random.uniform(0.75, 1.25))
+                    
+                    # 3. Clear status and return
+                    clear_status()
                     return user_text_input
         return "None"
 
@@ -157,20 +244,37 @@ def takeCommand():
     else:
         r = sr.Recognizer()
         with sr.Microphone() as source:
-            update_gui_output("Listening...", "User")
+            # 1. Show Listening (Temporary)
+            set_status("Listening...")
             r.pause_threshold = 1
             try:
-                if is_muted: return "None"
+                if is_muted: 
+                    clear_status()
+                    return "None"
+                
                 audio = r.listen(source, timeout=5, phrase_time_limit=10)
+                
+                # 2. Remove Listening, Show Processing (Temporary)
+                clear_status() 
+                
                 if is_muted: return "None"
-
-                update_gui_output("Processing...", "User")
+                
+                set_status("Processing...")
+                
                 query = r.recognize_google(audio, language=lang)
+                
+                # 3. Remove Processing
+                clear_status()
+                
+                # 4. Show User Input Permanently
                 update_gui_output(f"User said: {query}", "User")
+                
                 no_input = False 
                 return query
             
             except Exception as e:
+                # Ensure status is cleared if recognition fails
+                clear_status()
                 no_input = True
                 return "None"
 
@@ -264,9 +368,7 @@ def main():
         if order is None or order == "None":
             continue
             
-        # Passing 'speak' and 'ADDR' to the external logic
-        # Expecting process_order to return False if the user wants to exit
-        should_continue = processOrder.process_order(order.lower(), speak, ADDR)
+        should_continue = processOrder.process_order(order.lower(), speak, takeCommand, ADDR)
         
         if should_continue is False:
             assistant_running = False

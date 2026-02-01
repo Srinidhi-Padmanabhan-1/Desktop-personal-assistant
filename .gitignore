@@ -2,3 +2,4 @@ __pycache__/
 *.pyc
 name.txt
 address.txt
+saved_chats/
