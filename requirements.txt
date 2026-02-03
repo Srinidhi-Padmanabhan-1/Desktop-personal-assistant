@@ -1,4 +1,13 @@
 pyttsx3
 pypiwin32
+psutil
+pyautogui
+pyjokes
 SpeechRecognition
 PyAudio
+wikipedia
+pywhatkit
+playwright
+gTTS
+feedparser
+requests

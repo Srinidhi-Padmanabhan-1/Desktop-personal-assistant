@@ -115,8 +115,6 @@ def toggle_mute():
     global is_muted
     is_muted = not is_muted
     
-    # We do NOT print text here anymore. 
-    # takeCommand() loop picks up the state change and sets the temporary status.
     if is_muted:
         mute_button.config(text="🔇", bg="red")
         input_entry.config(state=tk.NORMAL)
@@ -150,8 +148,6 @@ def save_chat_history():
         i += 1
     
     # Get all text. This captures visible text.
-    # Note: If 'temp_status' is currently visible, it might be captured.
-    # We can clear status briefly before saving.
     clear_status()
     chat_content = output_text.get("1.0", "end-1c")
     
@@ -212,14 +208,22 @@ def speak(audio):
         engine.runAndWait()
 
 
-def takeCommand():
+# --- UPDATED takeCommand TO ACCEPT OPTIONAL LANGUAGE ---
+def takeCommand(language_code=None):
+    """
+    Accepts an optional language_code (e.g., 'hi-IN'). 
+    If provided, listens in that language. 
+    If None, listens in standard English (en-US).
+    """
     global lang
     global no_input
     global user_text_input
 
+    # Determine active language
+    active_lang = language_code if language_code else lang
+
     # --- MODE 1: TEXT INPUT (MUTED) ---
     if is_muted:
-        # Set temporary status
         set_status("System: Muted. Waiting for text...")
         
         while is_muted: 
@@ -244,8 +248,8 @@ def takeCommand():
     else:
         r = sr.Recognizer()
         with sr.Microphone() as source:
-            # 1. Show Listening (Temporary)
-            set_status("Listening...")
+            # 1. Show Listening
+            set_status(f"Listening ({active_lang})...")
             r.pause_threshold = 1
             try:
                 if is_muted: 
@@ -254,19 +258,15 @@ def takeCommand():
                 
                 audio = r.listen(source, timeout=5, phrase_time_limit=10)
                 
-                # 2. Remove Listening, Show Processing (Temporary)
                 clear_status() 
-                
                 if is_muted: return "None"
                 
                 set_status("Processing...")
                 
-                query = r.recognize_google(audio, language=lang)
+                # Use the dynamic language here
+                query = r.recognize_google(audio, language=active_lang)
                 
-                # 3. Remove Processing
                 clear_status()
-                
-                # 4. Show User Input Permanently
                 update_gui_output(f"User said: {query}", "User")
                 
                 no_input = False 

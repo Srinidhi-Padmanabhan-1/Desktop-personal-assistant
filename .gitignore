@@ -2,4 +2,8 @@ __pycache__/
 *.pyc
 name.txt
 address.txt
+PyWhatKit_DB.txt
+*.jpg
 saved_chats/
+saved_notes/
+screenshots/
