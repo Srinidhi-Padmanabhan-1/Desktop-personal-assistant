@@ -249,7 +249,7 @@ def takeCommand(language_code=None):
         r = sr.Recognizer()
         with sr.Microphone() as source:
             # 1. Show Listening
-            set_status(f"Listening ({active_lang})...")
+            set_status(f"Listening...")
             r.pause_threshold = 1
             try:
                 if is_muted: 
