@@ -13,7 +13,7 @@ import processOrder
 
 # --- Light Mode Configuration ---
 THEME_BG = "#F0F2F5"       # Light Grey (Window Background)
-THEME_ACCENT = "#0084FF"   # Blue
+THEME_ACCENT = "#0084FF"   # Messenger Blue
 THEME_TEXT = "#050505"     # Dark Text
 
 # Chat Text Colors
@@ -58,12 +58,18 @@ root.title("Emma AI")
 root.state("zoomed")
 root.configure(bg=THEME_BG)
 
-# 1. Header Frame
+# =============================================================================
+# LAYOUT SECTION - ORDER MATTERS HERE!
+# 1. Header (Top)
+# 2. Input Frame (Bottom) -> Packed BEFORE Chat so it stays visible!
+# 3. Chat Frame (Rest of the space)
+# =============================================================================
+
+# --- 1. HEADER (Top) ---
 header_frame = tk.Frame(root, bg=HEADER_BG, height=70)
 header_frame.pack(fill=tk.X, side=tk.TOP)
 header_frame.pack_propagate(False) 
 
-# Title
 title_label = tk.Label(
     header_frame, 
     text="🤖 Emma AI Assistant", 
@@ -73,9 +79,55 @@ title_label = tk.Label(
 )
 title_label.pack(side=tk.LEFT, padx=20)
 
-# 2. Chat Area
+# --- 2. INPUT FRAME (Bottom Footer) ---
+# We define variables here so functions can use them, but we pack the frame NOW.
+input_frame = tk.Frame(root, bg=THEME_BG, height=80)
+input_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=20, pady=20)
+
+def submit_text(event=None):
+    global user_text_input
+    text = input_entry.get()
+    if text.strip() != "":
+        user_text_input = text
+        input_entry.delete(0, tk.END)
+        input_event.set() 
+
+# Border Wrapper for the Textbox (Creates the outline effect)
+entry_border = tk.Frame(input_frame, bg="#CCCCCC", bd=0)
+entry_border.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
+
+input_entry = tk.Entry(
+    entry_border, 
+    font=("Segoe UI", 14), 
+    bg="#F0F2F5", # Starts Grey
+    fg=THEME_TEXT,
+    insertbackground="black", 
+    relief=tk.FLAT,
+    state=tk.DISABLED
+)
+# Padding creates the border thickness (1px)
+input_entry.pack(fill=tk.BOTH, expand=True, ipady=10, padx=1, pady=1) 
+input_entry.bind("<Return>", submit_text)
+
+# Send Button
+send_btn = tk.Button(
+    input_frame, 
+    text="➤", 
+    font=("Segoe UI", 16, "bold"), 
+    bg=BUTTON_BG, 
+    fg="#999999", # Starts Grey
+    bd=0, 
+    command=submit_text, 
+    state=tk.DISABLED, 
+    width=4,
+    cursor="hand2"
+)
+send_btn.pack(side=tk.RIGHT)
+
+
+# --- 3. CHAT AREA (Fills Remaining Space) ---
 chat_frame = tk.Frame(root, bg=THEME_BG)
-chat_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+chat_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=20, pady=(10, 0))
 
 output_text = ScrolledText(
     chat_frame, 
@@ -89,19 +141,18 @@ output_text = ScrolledText(
 )
 output_text.pack(expand=True, fill=tk.BOTH)
 
-# Configure Tags for Alignment and Color
+# Tags
 output_text.tag_config('emma', foreground=EMMA_COLOR, lmargin1=10, lmargin2=10, spacing1=5)
 output_text.tag_config('user', foreground=USER_COLOR, justify='right', rmargin=10, spacing1=5)
 output_text.tag_config('system', foreground=SYSTEM_COLOR, justify='center', font=("Segoe UI", 12, "italic"), spacing1=5)
 output_text.tag_config('temp_status', foreground=TEMP_STATUS_COLOR, justify='center', font=FONT_STATUS)
 
 
-# --- Helper Functions ---
+# =============================================================================
+# FUNCTION LOGIC
+# =============================================================================
 
 def update_gui_output(text, who_responding="Emma"):
-    """
-    Inserts PERMANENT text into the chat window with Icons.
-    """
     if who_responding == "Emma":
         formatted_text = f"🤖 {text}\n"
         output_text.insert(tk.END, formatted_text, 'emma')
@@ -113,13 +164,11 @@ def update_gui_output(text, who_responding="Emma"):
     output_text.see(tk.END)
 
 def set_status(text):
-    """ Sets a TEMPORARY grey message. """
     clear_status()
     output_text.insert(tk.END, f"\n( {text} )\n", 'temp_status')
     output_text.see(tk.END)
 
 def clear_status():
-    """ Removes the grey message. """
     try:
         ranges = output_text.tag_ranges('temp_status')
         for i in range(0, len(ranges), 2):
@@ -127,8 +176,7 @@ def clear_status():
     except Exception:
         pass
 
-
-# --- Button Functions ---
+# --- Buttons Logic ---
 
 def restart_assistant():
     global assistant_running
@@ -143,28 +191,18 @@ def toggle_mute():
     is_muted = not is_muted
     
     if is_muted:
-        # --- Active Text Mode ---
-        mute_button.config(text="🔇", bg="#FFCDD2", fg="#C62828") # Red Alert
-        
-        # Turn Textbox White and Border Blue
-        input_entry.config(state=tk.NORMAL, bg="#FFFFFF", fg="#000000") 
-        entry_border.config(bg=THEME_ACCENT) 
-        
-        # Enable Send Button (Blue)
-        send_btn.config(state=tk.NORMAL, bg=THEME_ACCENT, fg="white") 
-        
+        # Text Mode
+        mute_button.config(text="🔇", bg="#FFCDD2", fg="#C62828") 
+        input_entry.config(state=tk.NORMAL, bg="#FFFFFF")
+        entry_border.config(bg=THEME_ACCENT) # Blue Border
+        send_btn.config(state=tk.NORMAL, bg=THEME_ACCENT, fg="white") # Blue Button
         set_status("Muted. Type command below.")
     else:
-        # --- Active Voice Mode ---
+        # Voice Mode
         mute_button.config(text="🎙️", bg=BUTTON_BG, fg=BUTTON_FG) 
-        
-        # Grey out Textbox and Border
-        input_entry.config(state=tk.DISABLED, bg="#F0F2F5", fg="#666666") 
-        entry_border.config(bg="#CCCCCC") 
-        
-        # Disable Send Button
-        send_btn.config(state=tk.DISABLED, bg=BUTTON_BG, fg="#999999") 
-        
+        input_entry.config(state=tk.DISABLED, bg="#F0F2F5")
+        entry_border.config(bg="#CCCCCC") # Grey Border
+        send_btn.config(state=tk.DISABLED, bg=BUTTON_BG, fg="#999999") # Grey Button
         input_event.set()
         set_status("Microphone Active")
 
@@ -184,7 +222,7 @@ def save_chat_history():
         update_gui_output(f"Chat saved to {filename}", "System")
     except Exception as e: update_gui_output(f"Error: {str(e)}", "System")
 
-# --- Control Buttons (Header) ---
+# Header Buttons
 btn_frame = tk.Frame(header_frame, bg=HEADER_BG)
 btn_frame.pack(side=tk.RIGHT, padx=20)
 
@@ -197,55 +235,10 @@ mute_button.pack(side=tk.RIGHT, padx=5)
 restart_button = tk.Button(btn_frame, text="↻", font=("Segoe UI Emoji", 16), bg=BUTTON_BG, fg=BUTTON_FG, bd=0, command=restart_assistant, width=4)
 restart_button.pack(side=tk.RIGHT, padx=5)
 
-# --- Bottom Input ---
-# --- Bottom Input Area ---
-input_frame = tk.Frame(root, bg=THEME_BG, height=60)
-input_frame.pack(fill=tk.X, padx=20, pady=(0, 20))
-
-def submit_text(event=None):
-    global user_text_input
-    text = input_entry.get()
-    if text.strip() != "":
-        user_text_input = text
-        input_entry.delete(0, tk.END)
-        input_event.set() 
-
-# 1. THE BORDER FRAME (Acts as the colored outline)
-entry_border = tk.Frame(input_frame, bg="#CCCCCC", bd=0)
-entry_border.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 10))
-
-# 2. THE TEXTBOX (Inside the border frame)
-input_entry = tk.Entry(
-    entry_border, 
-    font=("Segoe UI", 14), 
-    bg="#F0F2F5", # Starts Grey (Voice Mode)
-    fg=THEME_TEXT,
-    insertbackground="black", 
-    relief=tk.FLAT
-)
-# The padx=1, pady=1 here creates the 1px border thickness by showing the frame behind it
-input_entry.pack(fill=tk.BOTH, expand=True, ipady=8, padx=1, pady=1) 
-input_entry.bind("<Return>", submit_text)
-
-# 3. THE SEND BUTTON
-send_btn = tk.Button(
-    input_frame, 
-    text="➤", 
-    font=("Segoe UI", 16, "bold"), 
-    bg=BUTTON_BG, 
-    fg="#999999", # Starts Grey (Disabled)
-    bd=0, 
-    command=submit_text, 
-    state=tk.DISABLED, 
-    width=4,
-    cursor="hand2"
-)
-send_btn.pack(side=tk.RIGHT, ipady=2)
 
 # --- CORE LOGIC ---
 
 def speak(audio, output_voice=True):
-    """ Displays text in chat. If output_voice is True, plays robotic audio. """
     update_gui_output(audio, "Emma")
     if not is_muted and output_voice:
         engine = pyttsx3.init('sapi5')
@@ -261,30 +254,55 @@ def takeCommand(language_code=None):
     """ Listens via mic or waits for text. Switches language for translation. """
     global lang, no_input, user_text_input
     active_lang = language_code if language_code else lang
+    
+    # --- MODE 1: TEXT INPUT (MUTED) ---
     if is_muted:
         set_status("Waiting for text...")
         while is_muted: 
+            # Wait for Enter key OR Unmute button
             is_set = input_event.wait(timeout=0.5)
+            
             if is_set:
                 input_event.clear()
+                
+                # If user clicked Unmute, stop waiting for text immediately
+                if not is_muted:
+                    return "None"
+
+                # Check if there is actual text to process
                 if user_text_input:
-                    update_gui_output(user_text_input, "User")
+                    cmd = user_text_input # Save text to local variable
+                    user_text_input = ""  # CLEAR global variable so it doesn't repeat
+                    
+                    update_gui_output(cmd, "User")
                     set_status("Processing...")
                     time.sleep(random.uniform(0.5, 1.0))
                     clear_status()
-                    return user_text_input
+                    return cmd
         return "None"
+
+    # --- MODE 2: VOICE INPUT (UNMUTED) ---
     else:
         r = sr.Recognizer()
         with sr.Microphone() as source:
             set_status("Listening...")
             r.pause_threshold = 1
             try:
+                # Check if user muted just before we started listening
                 if is_muted: return "None"
+                
                 audio = r.listen(source, timeout=5, phrase_time_limit=10)
+                
+                # Check if user muted while we were listening
+                if is_muted: 
+                    clear_status()
+                    return "None"
+                
                 clear_status() 
                 set_status("Processing...")
+                
                 query = r.recognize_google(audio, language=active_lang)
+                
                 clear_status()
                 update_gui_output(query, "User")
                 no_input = False 
@@ -310,14 +328,13 @@ def username(addr):
         with open("name.txt", "w") as file: file.write(uname)
         greet(addr,uname)
 
-# --- PRESERVED ORIGINAL WISHME LOGIC (POPUP) ---
 def wishMe():
     global Wish, ADDR
     speak(f"Good {Wish}")    
     speak("I am your virtual assistant Emma.")
     speak("How should I address you? sir, or mam")
 
-    addr_window = tk.Tk() # Original Logic
+    addr_window = tk.Tk()
     addr_window.title("Address Selection")
     addr_window.geometry(f"300x150")
     addr_window.attributes("-topmost", True)

@@ -306,7 +306,7 @@ def process_order(order, speak_func, take_command_func, addr):
         return True
 
     elif 'where is' in order or 'locate' in order:
-        query = order.replace("where is ", "").replace("locate ", "").strip()
+        query = order.replace("where is", "").replace("locate", "").strip()
         if not query:
             query = get_missing_input(speak_func, take_command_func, "What location do you want to find?")
             if not query: return True
