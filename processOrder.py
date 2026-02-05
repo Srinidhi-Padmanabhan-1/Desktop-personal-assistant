@@ -56,12 +56,19 @@ def get_lang_code(lang_name):
 def smart_speak(audio, original_speak_func):
     """
     Decides whether to use the main GUI speak function (pyttsx3) 
-    or gTTS based on the target language (to_lang).
+    or gTTS based on the target language.
     """
     global to_lang
     if to_lang == 'en':
+        # Standard English: Use the main speak function normally
         original_speak_func(audio)
     else:
+        # Foreign Language:
+        # 1. First, show the translated text in the chat window 
+        # (We tell main.py NOT to use the robotic voice so they don't overlap)
+        original_speak_func(audio, output_voice=False)
+        
+        # 2. Then play the high-quality gTTS voice
         try:
             tts = gTTS(text=audio, lang=to_lang, slow=False)
             tts.save("temp.mp3")
@@ -70,6 +77,7 @@ def smart_speak(audio, original_speak_func):
             os.remove("temp.mp3")
             os.system("taskkill /f /im wmplayer.exe >nul 2>&1") 
         except Exception as e:
+            # Fallback: if gTTS fails, just speak normally
             original_speak_func(audio)
 
 def speak_translated(final_url_tr, original_speak_func):

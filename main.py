@@ -189,10 +189,16 @@ send_btn = tk.Button(input_frame, text="Send", font=("Helvetica", 12, "bold"), b
 send_btn.pack(side=tk.RIGHT)
 
 
-def speak(audio):
+def speak(audio, output_voice=True):
+    """
+    Speaks the audio and updates GUI.
+    If output_voice is False, it only updates the chat window (used for translations).
+    """
+    # This line puts the text in the chat window
     update_gui_output("Emma: " + audio, "Emma")
     
-    if not is_muted:
+    # Only use the robotic pyttsx3 engine if not muted AND voice output is requested
+    if not is_muted and output_voice:
         engine = pyttsx3.init('sapi5')
         voices = engine.getProperty('voices')
         
