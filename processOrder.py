@@ -332,7 +332,14 @@ def process_order(order, speak_func, take_command_func, addr):
         if not os.path.exists(folder_name):
             os.makedirs(folder_name)
 
-        action = get_missing_input(speak_func, take_command_func, "Do you want to write a note or read a note?")
+        # Check if user already specified action in the main command (e.g., "write note")
+        if "write" in order:
+            action = "write"
+        elif "read" in order:
+            action = "read"
+        else:
+            # Only ask if not specified
+            action = get_missing_input(speak_func, take_command_func, "Do you want to write a note or read a note?")
         
         if action:
             if 'write' in action.lower():
@@ -449,15 +456,17 @@ def process_order(order, speak_func, take_command_func, addr):
             message = get_missing_input(speak_func, take_command_func, "Please say your message")
             
             if message:
-                speak_func("Sending the message on WhatsApp...")
-                kit.sendwhatmsg_instantly(f"+91{num}", message.lower())
+                speak_func("Opening WhatsApp Web...")
+                encoded_msg = message.replace(' ', '%20')
+
+                webbrowser.open(f"https://web.whatsapp.com/send?phone=+91{num}&text={encoded_msg}")
             else:
                 speak_func("No message provided.")
                 
         except ValueError:
             speak_func("Invalid contact number format.")
         except Exception as e:
-            speak_func("An error occurred while sending the message")
+            speak_func("An error occurred while opening WhatsApp")
         return True
 
     # --- Exit ---

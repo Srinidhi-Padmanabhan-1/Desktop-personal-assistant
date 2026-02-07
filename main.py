@@ -251,28 +251,34 @@ def speak(audio, output_voice=True):
         engine.runAndWait()
 
 def takeCommand(language_code=None):
-    """ Listens via mic or waits for text. Switches language for translation. """
+    """ 
+    Listens via mic or waits for text. 
+    Handles mode switching (Mute/Unmute) dynamically using recursion.
+    """
     global lang, no_input, user_text_input
+    
+    # Determine which language to use (Argument overrides global default)
     active_lang = language_code if language_code else lang
     
     # --- MODE 1: TEXT INPUT (MUTED) ---
     if is_muted:
         set_status("Waiting for text...")
+        
         while is_muted: 
-            # Wait for Enter key OR Unmute button
+            # Wait for Enter key (Text) OR Mute Toggle Button
             is_set = input_event.wait(timeout=0.5)
             
             if is_set:
                 input_event.clear()
                 
-                # If user clicked Unmute, stop waiting for text immediately
+                # FIX 1: User clicked Unmute -> Restart function to switch to Voice Mode immediately
                 if not is_muted:
-                    return "None"
+                    return takeCommand(language_code)
 
-                # Check if there is actual text to process
+                # Process Text Input
                 if user_text_input:
-                    cmd = user_text_input # Save text to local variable
-                    user_text_input = ""  # CLEAR global variable so it doesn't repeat
+                    cmd = user_text_input # Store locally
+                    user_text_input = ""  # Clear global to prevent repetition
                     
                     update_gui_output(cmd, "User")
                     set_status("Processing...")
@@ -288,25 +294,27 @@ def takeCommand(language_code=None):
             set_status("Listening...")
             r.pause_threshold = 1
             try:
-                # Check if user muted just before we started listening
-                if is_muted: return "None"
+                # FIX 2: Check if user muted just before we started listening
+                if is_muted: 
+                    return takeCommand(language_code)
                 
                 audio = r.listen(source, timeout=5, phrase_time_limit=10)
                 
-                # Check if user muted while we were listening
+                # FIX 3: Check if user muted while we were listening
                 if is_muted: 
-                    clear_status()
-                    return "None"
+                    return takeCommand(language_code)
                 
                 clear_status() 
                 set_status("Processing...")
                 
+                # Recognize using the active language
                 query = r.recognize_google(audio, language=active_lang)
                 
                 clear_status()
                 update_gui_output(query, "User")
                 no_input = False 
                 return query
+            
             except Exception:
                 clear_status()
                 no_input = True
