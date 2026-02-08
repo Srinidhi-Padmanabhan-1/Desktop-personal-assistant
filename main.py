@@ -291,6 +291,7 @@ def takeCommand(language_code=None):
     else:
         r = sr.Recognizer()
         with sr.Microphone() as source:
+            r.adjust_for_ambient_noise(source,duration=0.5)
             set_status("Listening...")
             r.pause_threshold = 1
             try:

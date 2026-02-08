@@ -113,13 +113,22 @@ def cpu(speak_func):
 
 def get_missing_input(speak_func, take_command_func, prompt):
     """
-    Helper to ask for input if the user forgot to specify it.
+    Helper to ask for input. 
+    It asks the prompt once, then listens up to 3 times silently before cancelling.
     """
     speak_func(prompt)
-    response = take_command_func()
-    if response == "None":
-        return ""
-    return response
+    
+    # Try 3 times total
+    for _ in range(3):
+        response = take_command_func()
+        
+        # If we got a valid response, return it immediately
+        if response and response != "None":
+            return response
+    
+    # If all 3 attempts failed
+    speak_func("I didn't hear anything. Cancelling operation.")
+    return ""
 
 # --- Main Logic Function ---
 
@@ -445,7 +454,7 @@ def process_order(order, speak_func, take_command_func, addr):
         return True
 
     # --- Communication ---
-    elif 'send whatsapp' in order:
+    elif 'whatsapp' in order:
         number_str = get_missing_input(speak_func, take_command_func, "Please say the contact number")
         if not number_str: return True
         
@@ -467,6 +476,65 @@ def process_order(order, speak_func, take_command_func, addr):
             speak_func("Invalid contact number format.")
         except Exception as e:
             speak_func("An error occurred while opening WhatsApp")
+        return True
+    
+    # --- CALCULATOR FEATURE ---
+    elif any(word in order for word in ['calculate', 'plus', 'minus', 'multiplied', 'divided', '+', '-', 'x ', '/']):
+        import re # Import locally to ensure it's available
+        
+        # Clean the command of conversational filler
+        query = order.replace("calculate", "").replace("what is", "").replace("how much is", "").strip()
+        
+        # If user just said "calculate", ask for numbers
+        if not query:
+            query = get_missing_input(speak_func, take_command_func, "What would you like me to calculate?")
+            if not query: return True
+
+        # 1. Map Spoken Words to Math Symbols
+        replacements = [
+            ('multiplied by', '*'),
+            ('divided by', '/'),
+            ('to the power of', '**'),
+            ('open bracket', '('),
+            ('close bracket', ')'),
+            ('open parenthesis', '('),
+            ('close parenthesis', ')'),
+            ('into', '*'),   # Common in Indian English
+            ('times', '*'),
+            ('plus', '+'),
+            ('minus', '-'),
+            ('mod', '%'),
+            (' x ', '*'),    # Handle 'x' as multiplication (with spaces to avoid words)
+            (' by ', '/')    # Handle 'by' as division
+        ]
+        
+        for phrase, symbol in replacements:
+            query = query.replace(phrase, symbol)
+
+        # 2. Sanitize: Remove EVERYTHING that isn't a number or a math operator
+        expression = re.sub(r'[^\d\+\-\*\/\.\%\(\)]', '', query)
+
+        if expression:
+            try:
+                # 3. Calculate
+                # eval is safe here because regex ensured only math characters exist
+                result = eval(expression)
+                
+                # Format: Remove .0 if it's a whole number (e.g., 5.0 -> 5)
+                if isinstance(result, float) and result.is_integer():
+                    result = int(result)
+                
+                speak_func(f"The answer is {result}")
+                
+            except ZeroDivisionError:
+                speak_func("I cannot divide by zero.")
+            except SyntaxError:
+                speak_func("The math formatting seems incorrect. Please check your brackets.")
+            except Exception:
+                speak_func("Sorry, I couldn't process that calculation.")
+        else:
+            speak_func("I didn't catch any numbers to calculate.")
+        
         return True
 
     # --- Exit ---
